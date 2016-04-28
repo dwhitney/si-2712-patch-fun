@@ -1,0 +1,1 @@
+It's been a headache working around the fact that I can't easily combine algebras with different type parameters, so here's some code using @milessabin's patch, that made me giddy - in a completely professional way, of course.
