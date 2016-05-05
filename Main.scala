@@ -42,38 +42,37 @@ class MapKVSInterpreter[K,V] extends (KVSADT[K,V,?] ~> Id){
 
 object MyService{
 
-  type PRG[A] = Coproduct[KVSADT[String,Int,?],KVSADT[Int,String,?], A]
-
-  def program(implicit KVSSI: KVSDSL[PRG,String,Int], KVSIS: KVSDSL[PRG,Int,String]): Free[PRG,String] = {
+  def program[P[_]](implicit
+    KVSSI: KVSDSL[P,String,Int]
+  , KVSIS: KVSDSL[P,Int,String]
+  , KVSSD: KVSDSL[P,String,Double]): Free[P,String] = {
     for{
       _   <- KVSSI.put("one", 1)
       one <- KVSSI.get("one")
       _   <- KVSIS.put(one, "one")
       str <- KVSIS.get(one)
+      _   <- KVSSD.put(str,one.doubleValue)
     } yield str
   }
 }
 
 object Main extends App{
 
+  type PRGEND[A] = Coproduct[KVSADT[String,Int,?],KVSADT[Int,String,?],A]
+  type PRG[A]    = Coproduct[KVSADT[String,Double,?],PRGEND,A]
+
   val SIMapInterpreter = new MapKVSInterpreter[String,Int]
   val ISMapInterpreter = new MapKVSInterpreter[Int,String]
+  val SDMapInterpreter = new MapKVSInterpreter[String,Double]
 
-  val coproductInterpreter: ~>[MyService.PRG, Id] = {
-    new ~>[MyService.PRG,Id]{
-      def apply[A](prg: MyService.PRG[A]): Id[A] = {
-        prg.run.fold(
-            kvssi => SIMapInterpreter(kvssi)
-          , kvsis => ISMapInterpreter(kvsis)
-        )
-      }
-    }
-  }
 
-  val prg = MyService.program
+  val coproductInterpreter: ~>[PRG, Id] = SDMapInterpreter or (SIMapInterpreter or ISMapInterpreter)
+
+  val prg = MyService.program[PRG]
 
   println(prg.foldMap(coproductInterpreter))
   println(SIMapInterpreter.map)
   println(ISMapInterpreter.map)
+  println(SDMapInterpreter.map)
 
 }
